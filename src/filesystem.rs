@@ -1,19 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-//
-// pub fn rename(source: &Path, target: &Path) -> Result<(), anyhow::Error> {
-//     let source_path = PathBuf::from("/path/to/source/file");
-//     let destination_path = PathBuf::from("/path/to/destination/file");
-//
-//     fs::rename(&source_path, &destination_path)?;
-//     Ok(())
-// }
-//
-// pub fn create_dir() {
-//     todo!();
-// }
-
 /// Get the last part of the path
 pub fn get_last_component(path: &Path) -> &str {
     match path.iter().last() {

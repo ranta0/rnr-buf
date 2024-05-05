@@ -10,12 +10,12 @@ pub struct FileDirPosition {
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
-pub struct FileHierarchy {
+pub struct FileList {
     pub list: BTreeSet<FileDirPosition>,
     pub raw: String,
 }
 
-impl FileHierarchy {
+impl FileList {
     pub fn new() -> Self {
         Self {
             list: BTreeSet::new(),
@@ -52,7 +52,7 @@ impl FileHierarchy {
         })
     }
 
-    pub fn enumerate(&mut self) -> Self {
+    pub fn enumerate(&mut self) {
         let mut new_self = Self::new();
         for (i, path) in self.list.iter().enumerate() {
             new_self.insert(path.source.to_owned(), i);
@@ -61,7 +61,7 @@ impl FileHierarchy {
             new_self.raw += &output_path;
         }
 
-        new_self
+        *self = new_self
     }
 
     pub fn get_by_index(&self, index: usize) -> Option<&FileDirPosition> {
@@ -77,9 +77,30 @@ impl FileHierarchy {
 
 #[cfg(test)]
 mod test {
+    use crate::filelist::{FileDirPosition, FileList};
 
     #[test]
-    fn test_hierarchy() {
-        todo!();
+    fn test_filelist_from_raw() {
+        use std::path::PathBuf;
+        let raw = "tmp/file_1.txt\ntmp/file_2.txt\ntmp/file_4.txt";
+        let result = FileList::new_from_raw(raw.to_owned());
+        match result {
+            Err(_) => {}
+            Ok(list) => {
+                let file_position = FileDirPosition {
+                    source: PathBuf::from(""),
+                    position: 0,
+                };
+                let first = list.get_by_index(0).unwrap_or(&file_position);
+                assert_eq!(PathBuf::from("tmp/file_1.txt"), first.source);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_filelist_duplicate_line() {
+        let raw = "tmp/file_1.txt\ntmp/file_2.txt\ntmp/file_1.txt";
+        let _ = FileList::new_from_raw(raw.to_owned()).unwrap();
     }
 }

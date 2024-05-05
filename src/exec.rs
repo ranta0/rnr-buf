@@ -9,13 +9,13 @@ use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
 use crate::config::Config;
-use crate::filehierarchy::FileHierarchy;
+use crate::filelist::FileList;
 use crate::filesystem::{
     all_dirs_exist, create_all_dirs, file_autonamer, get_last_component, has_hidden,
 };
 
-pub fn list_files(paths: Vec<String>, config: &Config) -> Result<FileHierarchy, anyhow::Error> {
-    let mut hierarchy = FileHierarchy::new();
+pub fn list_files(paths: Vec<String>, config: &Config) -> Result<FileList, anyhow::Error> {
+    let mut list = FileList::new();
 
     for path in paths {
         let process = PathBuf::from(&path);
@@ -34,17 +34,17 @@ pub fn list_files(paths: Vec<String>, config: &Config) -> Result<FileHierarchy, 
 
                 // check if dir
                 if entry_path.is_file() {
-                    hierarchy.insert(entry_path, 0);
+                    list.insert(entry_path, 0);
                 }
             }
         } else {
-            hierarchy.insert(process, 0);
+            list.insert(process, 0);
         }
     }
 
-    hierarchy = hierarchy.enumerate();
+    list.enumerate();
 
-    Ok(hierarchy)
+    Ok(list)
 }
 
 pub fn open_editor(outcome: &str, config: &Config) -> Result<String, anyhow::Error> {
@@ -86,8 +86,8 @@ pub fn open_editor(outcome: &str, config: &Config) -> Result<String, anyhow::Err
 }
 
 pub fn batch_operations(
-    original: &FileHierarchy,
-    modified: &FileHierarchy,
+    original: &FileList,
+    modified: &FileList,
     config: &Config,
 ) -> Result<(), anyhow::Error> {
     if original.list.len() != modified.list.len() {

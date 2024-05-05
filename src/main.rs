@@ -1,6 +1,6 @@
 mod cli;
 mod exec;
-mod filehierarchy;
+mod filelist;
 mod filesystem;
 mod config;
 
@@ -11,7 +11,7 @@ use clap::Parser;
 
 use crate::cli::Opts;
 use crate::exec::{list_files, open_editor};
-use crate::filehierarchy::FileHierarchy;
+use crate::filelist::FileList;
 
 use self::config::Config;
 use self::exec::batch_operations;
@@ -43,7 +43,7 @@ fn run() -> Result<(), anyhow::Error> {
 
     let raw = open_editor(&original.raw, &config)?;
 
-    let modified = FileHierarchy::new_from_raw(raw)?;
+    let modified = FileList::new_from_raw(raw)?;
 
     batch_operations(&original, &modified, &config)?;
 
