@@ -20,7 +20,6 @@ pub struct Config {
 
     /// Whether to automatically create dirs or not.
     pub mkdir: bool,
-
     // /// whether to follow symlinks or not.
     // pub follow_links: bool,
     //
@@ -57,8 +56,20 @@ pub struct Config {
     // pub strip_cwd_prefix: bool,
 }
 
+#[allow(dead_code)]
 impl Config {
-    pub fn new(opts: &Opts) -> Self {
+    pub fn new() -> Self {
+        Self {
+            automatic_rename: false,
+            absolute: false,
+            editor: None,
+            ignore_hidden: false,
+            recursive: true,
+            mkdir: true,
+        }
+    }
+
+    pub fn from_args(opts: &Opts) -> Self {
         Self {
             absolute: opts.absolute,
             editor: opts.editor.clone(),

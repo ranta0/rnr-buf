@@ -37,7 +37,7 @@ fn run() -> Result<(), anyhow::Error> {
         bail!("No valid paths given.");
     }
 
-    let config = Config::new(&opts);
+    let config = Config::from_args(&opts);
 
     let original = list_files(opts.paths, &config)?;
 

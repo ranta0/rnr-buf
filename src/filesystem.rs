@@ -54,7 +54,6 @@ pub fn create_all_dirs(path: &Path) -> Result<(), anyhow::Error> {
 pub fn file_autonamer(path: &Path) -> PathBuf {
     let mut new_file_path = path.to_path_buf();
 
-    // Check if the file already exists
     while new_file_path.exists() {
         // If it does, add a number to the filename and try again
         let file_name = path.file_name().unwrap().to_string_lossy();
@@ -70,7 +69,6 @@ pub fn file_autonamer(path: &Path) -> PathBuf {
 
         // Find the next available number
         let mut number = 1;
-        print!("{:?}", after_split);
 
         if !after_split.is_empty() {
             // Parse the string into an integer
@@ -86,6 +84,7 @@ pub fn file_autonamer(path: &Path) -> PathBuf {
             if !new_file_path.exists() {
                 break;
             }
+
             number += 1;
         }
     }

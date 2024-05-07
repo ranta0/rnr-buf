@@ -136,3 +136,83 @@ pub fn batch_operations(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use std::fs;
+    use std::path::PathBuf;
+
+    use crate::config::Config;
+
+    #[test]
+    fn test_list_files_recursive() {
+        use crate::exec::list_files;
+        let tempdir = tempfile::tempdir().expect("Error creating temp directory");
+        let temp_path = tempdir.path().to_str().unwrap();
+
+        let mock_dir = format!("{}/other", temp_path);
+        let mock_files: Vec<String> = vec![
+            format!("{}/file_1.txt", temp_path),
+            format!("{}/file_2.txt", temp_path),
+            format!("{}/file_3.txt", temp_path),
+            format!("{}/file_1.txt", mock_dir),
+            format!("{}/other_file_1.txt", mock_dir),
+        ];
+
+        // - tmp
+        //     |
+        //     - file_1.txt
+        //     |
+        //     - file_2.txt
+        //     |
+        //     - file_2.txt
+        //     |
+        //     - other
+        //         |
+        //         - file_1.txt
+        //         |
+        //         - other_file_1.txt
+
+        fs::create_dir(&mock_dir).expect("Error creating mock directory...");
+        for file in &mock_files {
+            fs::File::create(file).expect("Error creating mock file...");
+        }
+
+        let mock_config = Config::new();
+
+        if let Ok(result) = list_files(vec![temp_path.to_owned()], &mock_config) {
+            let first = result.get_by_index(0).unwrap_or_else(|| {
+                panic!("Failed to get the first item from the list.");
+            });
+            let last = result.get_by_index(4).unwrap_or_else(|| {
+                panic!("Failed to get the last item from the list.");
+            });
+
+            assert_eq!(
+                PathBuf::from(format!("{}{}", temp_path, "/file_1.txt")),
+                first.source
+            );
+            assert_eq!(
+                PathBuf::from(format!("{}{}", temp_path, "/other/other_file_1.txt")),
+                last.source
+            );
+        } else {
+            panic!("Failed to create FileList from raw data.");
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_editor() {
+        use super::open_editor;
+        let list_files = "tmp/file_1.txt\n".to_owned();
+
+        // Open a fake editor
+        let mut mock_config = Config::new();
+        mock_config.editor = Some("fake_cmd_editor".to_owned());
+
+        if open_editor(&list_files, &mock_config).is_err() {
+            panic!("Failed to open editor.");
+        }
+    }
+}

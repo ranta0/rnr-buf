@@ -77,30 +77,34 @@ impl FileList {
 
 #[cfg(test)]
 mod test {
-    use crate::filelist::{FileDirPosition, FileList};
+    use crate::filelist::FileList;
 
     #[test]
-    fn test_filelist_from_raw() {
+    fn test_new_from_raw() {
         use std::path::PathBuf;
         let raw = "tmp/file_1.txt\ntmp/file_2.txt\ntmp/file_4.txt";
-        let result = FileList::new_from_raw(raw.to_owned());
-        match result {
-            Err(_) => {}
-            Ok(list) => {
-                let file_position = FileDirPosition {
-                    source: PathBuf::from(""),
-                    position: 0,
-                };
-                let first = list.get_by_index(0).unwrap_or(&file_position);
-                assert_eq!(PathBuf::from("tmp/file_1.txt"), first.source);
-            }
+
+        if let Ok(result) = FileList::new_from_raw(raw.to_owned()) {
+            let first = result.get_by_index(0).unwrap_or_else(|| {
+                panic!("Failed to get the first item from the list.");
+            });
+
+            assert_eq!(3, result.list.len());
+            assert_eq!(PathBuf::from("tmp/file_1.txt"), first.source);
+        } else {
+            panic!("Failed to create FileList from raw data.");
         }
     }
 
     #[test]
     #[should_panic]
-    fn test_filelist_duplicate_line() {
+    fn test_duplicate_file() {
         let raw = "tmp/file_1.txt\ntmp/file_2.txt\ntmp/file_1.txt";
-        let _ = FileList::new_from_raw(raw.to_owned()).unwrap();
+        let _ = FileList::new_from_raw(raw.to_owned()).unwrap_or_else(|err| {
+            panic!(
+                "Expected to fail with duplicate file error, but got: {:?}",
+                err
+            );
+        });
     }
 }
