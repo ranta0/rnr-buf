@@ -79,7 +79,11 @@ pub fn file_autonamer(path: &Path) -> PathBuf {
         }
 
         loop {
-            let numbered_name = format!("{}_{}.{}", name, number, extension);
+            let mut numbered_name = format!("{}_{}", name, number);
+            if !extension.is_empty() {
+                numbered_name = format!("{}.{}", numbered_name, extension);
+            }
+
             new_file_path.set_file_name(&numbered_name);
             if !new_file_path.exists() {
                 break;
@@ -90,4 +94,37 @@ pub fn file_autonamer(path: &Path) -> PathBuf {
     }
 
     new_file_path
+}
+
+#[cfg(test)]
+mod test {
+    use std::fs::{remove_file, File};
+    use std::path::PathBuf;
+
+    use crate::filesystem::file_autonamer;
+
+    macro_rules! func_assert_rename {
+        ($($test_name:ident, $existing_file:expr, $func_name:ident ($value:expr) => $expected:expr)*) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    let _ = File::create(&$existing_file).expect("Failed to create file");
+
+                    let output = $func_name(PathBuf::from(&$value).as_path());
+                    drop(remove_file(&$existing_file));
+
+                    assert_eq!(output.to_str().unwrap_or(""), $expected);
+                }
+            )*
+        };
+    }
+
+    func_assert_rename!(
+        test_rename_no_match, "other.txt", file_autonamer ("file_1.txt") => "file_1.txt"
+        test_rename_match, "file_1.txt", file_autonamer ("file_1.txt") => "file_2.txt"
+        test_rename_compound, "file.txt", file_autonamer ("file.txt") => "file_1.txt"
+        test_rename_utf8, "👨.txt", file_autonamer ("👨.txt") => "👨_1.txt"
+        test_rename_harder_match, "_1file9.txt", file_autonamer ("_1file9.txt") => "_1file9_1.txt"
+        test_rename_no_extension, "file", file_autonamer ("file") => "file_1"
+    );
 }
