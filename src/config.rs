@@ -20,6 +20,13 @@ pub struct Config {
 
     /// Whether to automatically create dirs or not.
     pub mkdir: bool,
+
+    /// Confirm all changes.
+    pub yes: bool,
+
+    /// Whether to have terminal output or not. It will fail on error.
+    pub quiet: bool,
+
     // /// whether to follow symlinks or not.
     // pub follow_links: bool,
     //
@@ -51,9 +58,6 @@ pub struct Config {
     //
     // /// a list of custom ignore files.
     // pub ignore_files: vec<pathbuf>,
-    //
-    // /// whether or not to strip the './' prefix for search results
-    // pub strip_cwd_prefix: bool,
 }
 
 #[allow(dead_code)]
@@ -66,6 +70,8 @@ impl Config {
             ignore_hidden: false,
             recursive: true,
             mkdir: true,
+            yes: false,
+            quiet: false,
         }
     }
 
@@ -77,6 +83,8 @@ impl Config {
             automatic_rename: opts.automatic_rename,
             ignore_hidden: opts.ignore_hidden,
             mkdir: opts.mkdir,
+            yes: opts.yes,
+            quiet: opts.quiet,
         }
     }
 }

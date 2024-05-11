@@ -16,7 +16,7 @@ pub fn all_dirs_exist(path: &Path) -> bool {
     for component in path.components() {
         current_path.push(component);
 
-        if !current_path.exists() {
+        if current_path.extension().is_none() && !current_path.exists() {
             return false;
         }
     }

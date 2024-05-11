@@ -4,10 +4,10 @@ Used as a learning project more than anything else.
 
 ### TODO
 
-- Tests
-- Confimation on execution
-- Multiple config features (regex, etc)
-- github workflows
+- [x] Tests
+- [x] Confimation on execution
+- [ ] Multiple config features (regex, etc)
+- [ ] github workflows
 
 ### Features
 
@@ -15,7 +15,7 @@ Used as a learning project more than anything else.
 - Checks for inconsistencies
 - Allows for custom terminal editors
 
-### Inspirations
+### Inspired by
 
 - [itchny/mmv](https://github.com/itchyny/mmv)
 - [ismaelgv/rnr](https://github.com/ismaelgv/rnr)

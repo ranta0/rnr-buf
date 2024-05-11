@@ -3,12 +3,14 @@ use std::process::Command;
 use std::{env, fs};
 
 use anyhow::bail;
+use dialoguer::Confirm;
 use std::io::{Read, Write};
 use tempfile::NamedTempFile;
 
 use walkdir::WalkDir;
 
 use crate::config::Config;
+use crate::errors::error_string;
 use crate::filelist::FileList;
 use crate::filesystem::{
     all_dirs_exist, create_all_dirs, file_autonamer, get_last_component, has_hidden,
@@ -100,7 +102,7 @@ pub fn batch_operations(
             continue;
         }
 
-        // always found because the 2 buffers are at the very least the same size
+        // always found because the 2 buffers are the same size
         let index_element = modified.get_by_index(path.position).unwrap();
         let mut destination = index_element.source.clone();
 
@@ -121,17 +123,39 @@ pub fn batch_operations(
             }
         }
 
-        // TODO: show and ask for confirmation
-        println!("{:?} -> {:?}", path.source, destination);
-        if !all_dirs_exist(&destination) {
-            if !config.mkdir {
-                bail!("{:?} dirs do not exist", destination);
-            }
-
-            create_all_dirs(&destination)?;
+        if destination.exists() && config.automatic_rename {
+            destination = file_autonamer(&destination);
         }
 
-        fs::rename(&path.source, &destination)?;
+        if !config.quiet {
+            println!("{:?} -> {:?}", path.source, destination);
+        }
+
+        let mut confirmation = false;
+        if !config.yes || !config.quiet {
+            confirmation = Confirm::new()
+                .with_prompt("Are you sure?")
+                .interact()
+                .unwrap();
+        }
+
+        if confirmation {
+            if !all_dirs_exist(&destination) {
+                if !config.mkdir {
+                    bail!("{:?} dirs do not exist", destination);
+                }
+
+                create_all_dirs(&destination)?;
+            }
+
+            if !destination.exists() {
+                fs::rename(&path.source, &destination)?;
+            } else if config.quiet {
+                bail!("A file `{:?}` exists", destination);
+            } else {
+                println!("{}A file `{:?}` exists", error_string(), destination);
+            }
+        }
     }
 
     Ok(())
