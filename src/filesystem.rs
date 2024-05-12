@@ -37,17 +37,19 @@ pub fn has_hidden(path: &Path) -> bool {
     false
 }
 
-pub fn create_all_dirs(path: &Path) -> Result<(), anyhow::Error> {
+pub fn create_all_dirs(path: &Path) -> Result<Vec<PathBuf>, anyhow::Error> {
     let mut current_path = PathBuf::new();
+    let mut created_dirs: Vec<PathBuf> = Vec::new();
 
     for component in path.components() {
         current_path.push(component);
         if current_path.extension().is_none() && !current_path.exists() {
             fs::create_dir(&current_path)?;
+            created_dirs.push(current_path.clone());
         }
     }
 
-    Ok(())
+    Ok(created_dirs)
 }
 
 /// Given a pathbuf generate the next in line automatic

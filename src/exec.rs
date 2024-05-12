@@ -10,11 +10,18 @@ use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
 use crate::config::Config;
-use crate::errors::error_string;
 use crate::filelist::FileList;
 use crate::filesystem::{
     all_dirs_exist, create_all_dirs, file_autonamer, get_last_component, has_hidden,
 };
+
+#[derive(Debug)]
+pub struct Activity {
+    pub mkdirs: Vec<PathBuf>,
+    pub source: PathBuf,
+    pub given_destination_path: PathBuf,
+    pub destination: PathBuf,
+}
 
 pub fn list_files(paths: Vec<String>, config: &Config) -> Result<FileList, anyhow::Error> {
     let mut list = FileList::new();
@@ -91,10 +98,12 @@ pub fn batch_operations(
     original: &FileList,
     modified: &FileList,
     config: &Config,
-) -> Result<(), anyhow::Error> {
+) -> Result<Vec<Activity>, anyhow::Error> {
     if original.list.len() != modified.list.len() {
         bail!("Files are not matching creation and deletion are not allowed");
     }
+
+    let mut outcome: Vec<Activity> = Vec::new();
 
     for path in original.list.iter() {
         let found = modified.get_by_file(&path.source);
@@ -127,8 +136,40 @@ pub fn batch_operations(
             destination = file_autonamer(&destination);
         }
 
+        let mut activity = Activity {
+            mkdirs: Vec::new(),
+            source: path.source.clone(),
+            given_destination_path: index_element.source.clone(),
+            destination: destination.clone(),
+        };
+
+        let all_dirs_exist = all_dirs_exist(&destination);
+        let mut dir_missing_created = false;
+        if !all_dirs_exist {
+            if config.mkdir {
+                dir_missing_created = true;
+                activity.mkdirs = create_all_dirs(&destination)?;
+            }
+
+            if !config.quiet {
+                bail!("{:?} dirs do not exist", destination);
+            }
+        }
+
+        if !destination.exists() && (all_dirs_exist || dir_missing_created) {
+            outcome.push(activity);
+        } else if !config.quiet {
+            bail!("A file `{:?}` exists", destination);
+        }
+    }
+
+    Ok(outcome)
+}
+
+pub fn perfom_operations(outcome: &Vec<Activity>, config: &Config) -> Result<(), anyhow::Error> {
+    for activity in outcome {
         if !config.quiet {
-            println!("{:?} -> {:?}", path.source, destination);
+            println!("{:?} -> {:?}", activity.source, activity.destination);
         }
 
         let mut confirmation = false;
@@ -140,21 +181,7 @@ pub fn batch_operations(
         }
 
         if confirmation {
-            if !all_dirs_exist(&destination) {
-                if !config.mkdir {
-                    bail!("{:?} dirs do not exist", destination);
-                }
-
-                create_all_dirs(&destination)?;
-            }
-
-            if !destination.exists() {
-                fs::rename(&path.source, &destination)?;
-            } else if config.quiet {
-                bail!("A file `{:?}` exists", destination);
-            } else {
-                println!("{}A file `{:?}` exists", error_string(), destination);
-            }
+            fs::rename(&activity.source, &activity.destination)?;
         }
     }
 
@@ -166,7 +193,184 @@ mod test {
     use std::fs;
     use std::path::PathBuf;
 
+    use super::Activity;
     use crate::config::Config;
+
+    #[derive(Debug)]
+    pub struct TestingActivity<'a> {
+        // pub mkdirs: Vec<&'a str>,
+        pub source: &'a str,
+        pub destination: &'a str,
+    }
+
+    fn assert_compare_activities(
+        activity: &Activity,
+        testing_activity: &TestingActivity,
+        temp_path: String,
+    ) {
+        use std::path::MAIN_SEPARATOR;
+
+        match (activity.source.to_str(), activity.destination.to_str()) {
+            (Some(source), Some(destination)) => {
+                assert_eq!(
+                    source,
+                    format!("{}{}{}", temp_path, MAIN_SEPARATOR, testing_activity.source)
+                );
+                assert_eq!(
+                    destination,
+                    format!(
+                        "{}{}{}",
+                        temp_path, MAIN_SEPARATOR, testing_activity.destination
+                    )
+                );
+            }
+            _ => {
+                panic!("error converting pathbuf to string.")
+            }
+        }
+    }
+
+    macro_rules! func_test_operations {
+        ($($test_name:ident, $before_list:expr, $after_list:expr, $activities:expr, $config:expr)*) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    use std::path::MAIN_SEPARATOR;
+
+                    use crate::filelist::FileList;
+                    use crate::exec::batch_operations;
+
+                    let tempdir = tempfile::tempdir().expect("Error creating temp directory");
+                    let temp_path = tempdir.path().to_str().unwrap();
+
+                    let mock_dir = format!("{}/other", temp_path);
+                    let mock_files: Vec<String> = vec![
+                        format!("{}/file_1.txt", temp_path),
+                        format!("{}/file_2.txt", temp_path),
+                        format!("{}/file_3.txt", temp_path),
+                        format!("{}/file_1.txt", mock_dir),
+                        format!("{}/other_file_1.txt", mock_dir),
+                    ];
+
+                    // - tmp
+                    //     |
+                    //     - file_1.txt
+                    //     |
+                    //     - file_2.txt
+                    //     |
+                    //     - file_3.txt
+                    //     |
+                    //     - other
+                    //         |
+                    //         - file_1.txt
+                    //         |
+                    //         - other_file_1.txt
+
+                    fs::create_dir(&mock_dir).expect("Error creating mock directory...");
+                    for file in &mock_files {
+                        fs::File::create(file).expect("Error creating mock file...");
+                    }
+
+                    let mut before_list_raw_string = String::new();
+                    for string in &mut $before_list {
+                        before_list_raw_string.push_str(format!("{}{}{}\n", temp_path, MAIN_SEPARATOR, string).as_str())
+                    }
+
+                    let mut after_list_raw_string = String::new();
+                    for string in &mut $after_list {
+                        after_list_raw_string.push_str(format!("{}{}{}\n", temp_path, MAIN_SEPARATOR, string).as_str())
+                    }
+
+                    match (FileList::new_from_raw(before_list_raw_string), FileList::new_from_raw(after_list_raw_string)) {
+                        (Ok(before_list), Ok(after_list)) => {
+                            match batch_operations(&before_list, &after_list, &$config) {
+                                Ok(outcome) => {
+                                    for (result, expected) in outcome.iter().zip($activities.iter()) {
+                                        assert_compare_activities(
+                                            result,
+                                            expected,
+                                            temp_path.to_owned()
+                                        );
+                                    }
+                                }
+                                Err(err) => {
+                                    panic!("{}", err);
+                                }
+                            }
+                        }
+                        _ => {
+                            panic!("Failed to create file list.");
+                        }
+                    }
+                }
+            )*
+        };
+    }
+
+    func_test_operations!(
+        test_batch_operations_move,
+        ["file_1.txt", "file_3.txt"],
+        ["file_1.txt", "file_4.txt"],
+        [TestingActivity {
+            source: "file_3.txt",
+            destination: "file_4.txt",
+        }],
+        Config {
+            automatic_rename: false,
+            absolute: false,
+            editor: None,
+            ignore_hidden: false,
+            recursive: true,
+            mkdir: false,
+            yes: false,
+            quiet: false,
+        }
+
+        // other/other_file_1 exists
+        test_batch_operations_rename,
+        ["file_1.txt", "file_3.txt"],
+        ["file_1.txt", "other/other_file_1.txt"],
+        [TestingActivity {
+            source: "file_3.txt",
+            destination: "other/other_file_2.txt",
+        }],
+        Config {
+            automatic_rename: true,
+            absolute: false,
+            editor: None,
+            ignore_hidden: false,
+            recursive: true,
+            mkdir: false,
+            yes: false,
+            quiet: false,
+        }
+
+        test_batch_operations_move_many,
+        ["file_1.txt", "file_2.txt", "other/other_file_1.txt"],
+        ["file_10.txt", "file_20.txt", "other/other_file_10.txt"],
+        [TestingActivity {
+            source: "file_1.txt",
+            destination: "file_10.txt",
+        },
+        TestingActivity {
+            source: "file_2.txt",
+            destination: "file_20.txt",
+        },
+        TestingActivity {
+            source: "other/other_file_1.txt",
+            destination: "other/other_file_10.txt",
+        }],
+        Config {
+            automatic_rename: false,
+            absolute: false,
+            editor: None,
+            ignore_hidden: false,
+            recursive: true,
+            mkdir: false,
+            yes: false,
+            quiet: false,
+        }
+    );
 
     #[test]
     fn test_list_files_recursive() {

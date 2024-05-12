@@ -11,12 +11,10 @@ use anyhow::bail;
 use clap::Parser;
 
 use crate::cli::Opts;
+use crate::config::Config;
 use crate::errors::error_string;
-use crate::exec::{list_files, open_editor};
+use crate::exec::{batch_operations, list_files, open_editor, perfom_operations};
 use crate::filelist::FileList;
-
-use self::config::Config;
-use self::exec::batch_operations;
 
 fn main() {
     let result = run();
@@ -47,7 +45,9 @@ fn run() -> Result<(), anyhow::Error> {
 
     let modified = FileList::new_from_raw(raw)?;
 
-    batch_operations(&original, &modified, &config)?;
+    let outcome = batch_operations(&original, &modified, &config)?;
+
+    perfom_operations(&outcome, &config)?;
 
     Ok(())
 }

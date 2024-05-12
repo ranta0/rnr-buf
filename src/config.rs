@@ -26,7 +26,6 @@ pub struct Config {
 
     /// Whether to have terminal output or not. It will fail on error.
     pub quiet: bool,
-
     // /// whether to follow symlinks or not.
     // pub follow_links: bool,
     //
